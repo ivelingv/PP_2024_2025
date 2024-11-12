@@ -16,8 +16,8 @@ namespace AsyncFIleWriter
             if (!int.TryParse(
               Console.ReadLine()?.ToString(),
               out var threadsCount)
-              || threadsCount < 1
-              || threadsCount > 100)
+                || threadsCount < 1
+                || threadsCount > 100)
             {
                 Console.WriteLine($"Invalid Thread Count");
                 return;
@@ -74,7 +74,10 @@ namespace AsyncFIleWriter
             int threadsCount)
         {
             var fileSize = await GetFileSizeAsync(SourseFile);
-            var bytesPerThread = (int)Math.Ceiling((decimal)fileSize / threadsCount);
+            
+            var bytesPerThread = (int)Math.Ceiling(
+                (decimal)fileSize / threadsCount);
+
             var taskList = new List<Task>(threadsCount);
 
             for (int i = 0; i < threadsCount; i++)
@@ -109,13 +112,17 @@ namespace AsyncFIleWriter
                access: FileAccess.Read,
                share: FileShare.Read))
             {
+                sourceStream.Position = startPosition;
+
                 using (var destinationStream = new FileStream(
                     path: destinationFileName,
                     mode: FileMode.Create,
                     access: FileAccess.Write,
                     share: FileShare.Write))
                 {
-                    while (sourceStream.Position != sourceStream.Length)
+                    destinationStream.Position = startPosition;
+
+                    while (sourceStream.Position != endPosition)
                     {
                         var readBytes = await sourceStream.ReadAsync(
                             buffer: buffer,
