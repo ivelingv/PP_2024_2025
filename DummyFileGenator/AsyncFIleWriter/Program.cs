@@ -5,7 +5,9 @@ namespace AsyncFIleWriter
 {
     internal class Program
     {
+        static SemaphoreSlim SemaphoreSlim = new SemaphoreSlim(1, 1);
         static Stopwatch Stopwatch = new Stopwatch();
+        static object Key = new object();
 
         static string SourseFile = "C:\\Users\\iveli\\source" +
             "\\repos\\PP_2024_2025\\DummyFileGenator\\AsyncFileGenerator" +
@@ -65,6 +67,8 @@ namespace AsyncFIleWriter
                             buffer: buffer,
                             offset: 0,
                             count: readBytes);
+
+                       
                     }
                 }
             }
@@ -98,44 +102,60 @@ namespace AsyncFIleWriter
 
         }
 
-        static async Task CopyFileInParallelAsync(
+        static Task CopyFileInParallelAsync(
             int startPosition,
             int endPosition,
             string sourceFileName,
             string destinationFileName)
         {
-            var buffer = new byte[4096];
-
-            using (var sourceStream = new FileStream(
-               path: sourceFileName,
-               mode: FileMode.Open,
-               access: FileAccess.Read,
-               share: FileShare.Read))
+            return Task.Run(async () =>
             {
-                sourceStream.Position = startPosition;
+                var buffer = new byte[40960];
 
-                using (var destinationStream = new FileStream(
-                    path: destinationFileName,
-                    mode: FileMode.Create,
-                    access: FileAccess.Write,
-                    share: FileShare.Write))
+                using (var sourceStream = new FileStream(
+                   path: sourceFileName,
+                   mode: FileMode.Open,
+                   access: FileAccess.Read,
+                   share: FileShare.Read))
                 {
-                    destinationStream.Position = startPosition;
+                    sourceStream.Position = startPosition;
 
-                    while (sourceStream.Position != endPosition)
+                    using (var destinationStream = new FileStream(
+                        path: destinationFileName,
+                        mode: FileMode.Create,
+                        access: FileAccess.Write,
+                        share: FileShare.Write))
                     {
-                        var readBytes = await sourceStream.ReadAsync(
-                            buffer: buffer,
-                            offset: 0,
-                            count: buffer.Length);
+                        destinationStream.Position = startPosition;
 
-                        await destinationStream.WriteAsync(
-                            buffer: buffer,
-                            offset: 0,
-                            count: readBytes);
+                        await SemaphoreSlim.WaitAsync();
+
+                        //lock (Key)
+                        //{
+                            while (sourceStream.Position < endPosition)
+                            {
+                                var readBytes = await sourceStream.ReadAsync(
+                                    buffer: buffer,
+                                    offset: 0,
+                                    count: buffer.Length);
+
+                                await destinationStream.WriteAsync(
+                                    buffer: buffer,
+                                    offset: 0,
+                                    count: readBytes);
+
+                                Console.WriteLine(
+                                   $"Writing {readBytes} bytes from {sourceStream.Position} " +
+                                   $"position to {endPosition} " +
+                                   $"in file from thread " +
+                                   $"{Thread.CurrentThread.ManagedThreadId}");
+                            }
+
+                        SemaphoreSlim.Release();
+                        //}
                     }
                 }
-            }
+            });
         }
 
         static Task<long> GetFileSizeAsync(
