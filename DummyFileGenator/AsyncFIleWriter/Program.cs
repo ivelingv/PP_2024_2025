@@ -8,38 +8,25 @@ namespace AsyncFIleWriter
         static Stopwatch Stopwatch = new Stopwatch();
 
         static string SourseFile = "C:\\Users\\iveli\\source" +
-            "\\repos\\DummyFileGenator\\AsyncFileGenerator" +
+            "\\repos\\PP_2024_2025\\DummyFileGenator\\AsyncFileGenerator" +
             "\\bin\\Debug\\net6.0\\sourceFile.txt";
 
         static async Task Main(string[] args)
         {
-            Stopwatch.Start();
-
             if (!int.TryParse(
-                Console.ReadKey().KeyChar.ToString(), 
-                out var threadsCount) 
-                || threadsCount < 1 
-                || threadsCount > 100)
+              Console.ReadLine()?.ToString(),
+              out var threadsCount)
+              || threadsCount < 1
+              || threadsCount > 100)
             {
                 Console.WriteLine($"Invalid Thread Count");
                 return;
             }
 
-            var fileSize = await GetFileSizeAsync(SourseFile);
-            var bytesPerThread = (int)(fileSize / threadsCount);
-            var currentPosition = 0;
+            Stopwatch.Start();
 
-            for (int i = 0; i < threadsCount; i++) 
-            {
-                CopyFileInParallelAsync(
-                    currentPosition,
-                    (int)(fileSize - currentPosition > bytesPerThread 
-                        ? bytesPerThread
-                        : fileSize - currentPosition),
-                    SourseFile,
-                    Path.GetFileName(SourseFile));
-            }
-
+            await CopyFileInParallelAsync(threadsCount);
+            //await CopyFileAsync(SourseFile, Path.GetFileName(SourseFile));
 
             Stopwatch.Stop();
 
@@ -84,43 +71,56 @@ namespace AsyncFIleWriter
         }
 
         static async Task CopyFileInParallelAsync(
+            int threadsCount)
+        {
+            var fileSize = await GetFileSizeAsync(SourseFile);
+            var bytesPerThread = (int)Math.Ceiling((decimal)fileSize / threadsCount);
+            var taskList = new List<Task>(threadsCount);
+
+            for (int i = 0; i < threadsCount; i++)
+            {
+                var currentPosition = i * bytesPerThread;
+                var endPosition = (int)Math.Min(currentPosition + bytesPerThread, fileSize);
+
+                var task = CopyFileInParallelAsync(
+                    currentPosition,
+                    endPosition,
+                    SourseFile,
+                    Path.GetFileName(SourseFile));
+
+                taskList.Add(task);
+            }
+
+            await Task.WhenAll(taskList.ToArray());
+
+        }
+
+        static async Task CopyFileInParallelAsync(
             int startPosition,
-            int numberOfBytes,
+            int endPosition,
             string sourceFileName,
             string destinationFileName)
         {
-            int totalNumberOfBytesRead = 0;
             var buffer = new byte[4096];
 
             using (var sourceStream = new FileStream(
-                path: sourceFileName,
-                mode: FileMode.Open,
-                access: FileAccess.Read,
-                share: FileShare.None))
+               path: sourceFileName,
+               mode: FileMode.Open,
+               access: FileAccess.Read,
+               share: FileShare.Read))
             {
-                sourceStream.Seek(startPosition, SeekOrigin.Begin);
-
                 using (var destinationStream = new FileStream(
                     path: destinationFileName,
                     mode: FileMode.Create,
-                    access: FileAccess.ReadWrite,
-                    share: FileShare.ReadWrite))
+                    access: FileAccess.Write,
+                    share: FileShare.Write))
                 {
-                    destinationStream.Seek(startPosition, SeekOrigin.Begin);
-
-                    while (numberOfBytes != totalNumberOfBytesRead)
+                    while (sourceStream.Position != sourceStream.Length)
                     {
-                        var bytesToRead = buffer.Length;
-
-                        if (numberOfBytes - totalNumberOfBytesRead < bytesToRead)
-                        {
-                            bytesToRead = numberOfBytes - totalNumberOfBytesRead;
-                        }
-
                         var readBytes = await sourceStream.ReadAsync(
                             buffer: buffer,
                             offset: 0,
-                            count: bytesToRead);
+                            count: buffer.Length);
 
                         await destinationStream.WriteAsync(
                             buffer: buffer,
@@ -131,7 +131,8 @@ namespace AsyncFIleWriter
             }
         }
 
-        static Task<long> GetFileSizeAsync(string fileName)
+        static Task<long> GetFileSizeAsync(
+            string fileName)
         {
             var info = new FileInfo(fileName);
             return Task.FromResult(info.Length);
