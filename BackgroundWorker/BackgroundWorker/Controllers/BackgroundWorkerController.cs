@@ -1,6 +1,8 @@
 ﻿using BackgroundWorker.Models;
+using BackgroundWorker.Services;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using System.Reflection;
 using System.Threading;
 
 namespace BackgroundWorker.Controllers
@@ -9,16 +11,28 @@ namespace BackgroundWorker.Controllers
     [Route("api/[controller]")]
     public class BackgroundWorkerController : ControllerBase
     {
+        private readonly WorkerService _service;
+
+        public BackgroundWorkerController(
+            WorkerService service)
+        {
+            _service = service;
+        }
+
         [HttpGet("[action]")]
         public async Task<IActionResult> GetWorkersListAsync(
             CancellationToken cancellationToken)
         {
-            return Ok(
-                new[]
+            var workers = _service.GetWorkers()
+                .Select(e => new WorkerModel
                 {
-                    new WorkerModel(),
-                    new WorkerModel()
-                });
+                    Id = e.Id,
+                    Name = e.Name,
+                    TotalCompletedJobs = e.TotalCompletedJobs
+                })
+                .ToArray();
+
+            return Ok(workers);
         }
 
         [HttpGet("[action]")]
@@ -48,7 +62,19 @@ namespace BackgroundWorker.Controllers
             [FromBody] CreateWorkerModel model,
             CancellationToken cancellationToken)
         {
-            return Ok(model);
+            if (string.IsNullOrEmpty(model.Name))
+            {
+                return BadRequest(new { Error = "Worker name is required!" });
+            }
+
+            var worker = _service.CreateWorker(model.Name);
+
+            return Ok(new WorkerModel
+            {
+                Id = worker.Id,
+                Name = worker.Name,
+                TotalCompletedJobs = worker.TotalCompletedJobs
+            });
         }
 
         [HttpDelete("[action]/{workerId}")]
@@ -56,7 +82,19 @@ namespace BackgroundWorker.Controllers
             [FromRoute] string workerId,
             CancellationToken cancellationToken)
         {
-            return Ok();
+            if (string.IsNullOrEmpty(workerId))
+            {
+                return BadRequest(new { Error = "Worker id is required!" });
+            }
+
+            var worker = _service.DeleteWorker(workerId);
+
+            return Ok(new WorkerModel
+            {
+                Id = worker.Id,
+                Name = worker.Name,
+                TotalCompletedJobs = worker.TotalCompletedJobs
+            });
         }
 
         [HttpPost("[action]")]

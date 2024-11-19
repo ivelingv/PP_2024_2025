@@ -1,3 +1,5 @@
+using BackgroundWorker.Services;
+
 namespace BackgroundWorker
 {
     public class Program
@@ -12,6 +14,9 @@ namespace BackgroundWorker
             // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
             builder.Services.AddEndpointsApiExplorer();
             builder.Services.AddSwaggerGen();
+
+            builder.Services.AddSingleton<WorkerCollection>();
+            builder.Services.AddScoped<WorkerService>();
 
             var app = builder.Build();
 
