@@ -15,7 +15,11 @@ namespace BackgroundWorker
             builder.Services.AddEndpointsApiExplorer();
             builder.Services.AddSwaggerGen();
 
+
+            builder.Services.AddSingleton<JobCollection>();
             builder.Services.AddSingleton<WorkerCollection>();
+
+            builder.Services.AddScoped<JobSevice>();
             builder.Services.AddScoped<WorkerService>();
 
             var app = builder.Build();

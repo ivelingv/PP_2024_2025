@@ -3,11 +3,14 @@
     // ivelin.georgiev.bs@gmail.com
     public class WorkerService
     {
+        private readonly JobCollection _jobs;
         private readonly WorkerCollection _workers;
 
         public WorkerService(
+            JobCollection jobs,
             WorkerCollection workers) 
         {
+            _jobs = jobs;
             _workers = workers;
         }
         
@@ -31,11 +34,40 @@
 
             worker.WorkerThread = Task.Run(async () =>
             {
+               
                 while(!worker.CancellationToken.IsCancellationRequested)
                 {
-                    // TODO: Check the list of jobs if
-                    // there is something to execute.
+                    if (!GlobalLock.ResetEvent.WaitOne(100))
+                    {
+                        Console.WriteLine($"Worker [{worker.Id}] paused...");
+                    };
+
+                    GlobalLock.ResetEvent.WaitOne();
                     Console.WriteLine($"Worker [{worker.Id}] waiting for jobs...");
+
+                    if (!worker.IsWorking)
+                    {
+                        //await GlobalLock.Semaphore.WaitAsync();
+                        lock (GlobalLock.Lock)
+                        {
+                            var job = _jobs
+                                .Where(e => e.Status == Status.Queued)
+                                .FirstOrDefault();
+
+                            if (job != null)
+                            {
+                                worker.AssignJob(job);
+                            }
+                        }
+                        //GlobalLock.Semaphore.Release();
+                        await worker.WaitForJobAsync();
+                        
+                        if (worker.IsWorking)
+                        {
+                            worker.CompleteJob();
+                        }
+                    }
+
                     await Task.Delay(3000);
                 }
 
